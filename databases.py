@@ -178,12 +178,12 @@ class SqliteDatabase(Database):
 		table = model.__class__.__name__
 		pkey = model.primary_key
 		#test = model.primary_key
-		print "pkey:",repr(pkey)
+		print "pkey:",repr(pkey),pkey,str(pkey)=='null',type(str(pkey))
 		fields = model.update_fields
 
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
-		if pkey  == 'null':
+		if str(pkey)  == 'null':
 			field_string = ','.join([str(value) for name,value in fields.items() if value is not None])	
 			statement = "INSERT INTO {0} VALUES ({1})".format(table,field_string,pkey)
 			self.execute(statement)
