@@ -156,17 +156,16 @@ class SqliteDatabase(Database):
 		
 		return results
 		
-	def get_next_id(self,table):
+	def get_next_id(self,table,pkey):
 		""" Get next valid id from autoincrementing id field
 		"""
-		statement = "SELECT max(id) from {0}".format(table)
+		max_pkey = "max({0})".format(pkey)
+		statement = "SELECT {0} from {1}".format(max_pkey,table)
 		self.execute(statement)
 		result = self.fetchone()
-		if 'max(id)' not in result:
-			result = 0
-		else:
-			result = result['max(id)']
-		return result
+
+		print "next id: ",result
+		return 0 if max_pkey not in result else result[max_pkey] 
 		
 	def modify(self,model):
 		""" Modify existing row or create if row doesn't exist
@@ -179,22 +178,32 @@ class SqliteDatabase(Database):
 		pkey = model.primary_key
 		#test = model.primary_key
 		print "pkey:",repr(pkey),pkey,str(pkey)=='null',type(str(pkey))
-		fields = model.update_fields
+		temp_fields = model.update_fields
 
+		fields = []
+		for index, f in enumerate(self._model_fields[table]):
+			fields.append((f[0],temp_fields[f[0]]))
+		print "fields2:" ,fields
+		
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
 		if str(pkey)  == 'null':
-			field_string = ','.join([str(value) for name,value in fields.items() if value is not None])	
+			field_string = ','.join([str(value) for name,value in fields if value is not None])	
 			statement = "INSERT INTO {0} VALUES ({1})".format(table,field_string,pkey)
+			print statement
 			self.execute(statement)
 			
 			# make sure insertion sends back the updated id
-			model.id = self.get_next_id(table)
+			model.primary_key = self.get_next_id(table,model.__primary_key__)
+			print "id: ",model.primary_key
 		else:
-			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields.items() if value is not None])	
-			statement = "UPDATE {0} SET {1} WHERE Id = {2}".format(table,field_string,pkey)
+			fields = fields[1:] #todo:  find better way to pop first element off list (first elem is primary key)
+
+			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields if value is not None])	
+			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(table,field_string,model.__primary_key__,pkey)
+			print statement
 			self.execute(statement)
-		print statement
+		
 		
 		
 	def add_model(self,model_type,**kwargs):
@@ -212,12 +221,18 @@ class SqliteDatabase(Database):
 		self._models[model_name] = model_type
 
 		# extract model.field types 
-		self._model_fields[model_name] = dict(
+		self._model_fields[model_name] = list(
 			(field_name,field_type) 
 			for field_name,field_type 
 			in model_type.__fields__.items()
 		)
+
+		# sort by primary_key, make sure to use model_type's attribute dictionary or else you won't be using valid class attributes
+		self._model_fields[model_name] = sorted(self._model_fields[model_name],key=lambda key:model_type.__dict__[key[0]].primary_key,reverse=True)
 		
+		for f in self._model_fields[model_name]:
+			print "model field: " ,f[0],repr(f[1]),model_type.__dict__[f[0]].primary_key
+
 		if 'create_table' in kwargs and kwargs['create_table']:
 			self.create_table_from_model(model_name,**kwargs)
 			
@@ -231,26 +246,21 @@ class SqliteDatabase(Database):
 		if model_name == None or model_name not in self._model_fields:
 			print "[Warning] - Model <{0}> not is not valid.  (Either None or not added with add_model())".format(model_name)
 			return
-			
-		#fields = self._model_fields[model_name]
-		fields = dict(
-			(field_name,field_type) 
-			for field_name,field_type 
-			in self._models[model_name].__fields__.items()
-		)
 
-		#test = sorted(fields,key=lambda key:key.primary_key,reverse=True)
-		#print "test:",self._models[model_name].primary_key
-		#for x in fields:
-		#	print "x:",x,fields[x],fields[x].primary_key
-		field_string = ','.join(["{0} {1}".format(name,self._field_types[type]) for name,type in fields.items()])
+		fields = self._model_fields[model_name]
+		field_string = ','.join(["{0} {1}".format(name,self._field_types[type]) for name,type in fields])
 		
 		if 'drop_existing' in kwargs and kwargs['drop_existing']:
 			statement = "DROP TABLE IF EXISTS {0}".format(model_name)
 			print statement
 			self.execute(statement)
 		
-		field_string = str.replace(field_string,"id integer", "id integer PRIMARY KEY")
+		pkey_name = self._models[model_name].__primary_key__
+		pkey_db_type = self._field_types[fields[0][1]]
+		#print "create primary key: ",pkey_name
+		#print "type: ", pkey_db_type
+
+		field_string = str.replace(field_string,"{0} {1}".format(pkey_name,pkey_db_type), "{0} {1} PRIMARY KEY".format(pkey_name,pkey_db_type))
 		statement = "CREATE TABLE {0} ({1})".format(model_name,field_string)
 		print statement
 		self.execute(statement)

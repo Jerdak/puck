@@ -34,34 +34,38 @@ class Model(object):
 			# are cached for lookup during initialization
 			for k,v in klass.__dict__.items():
 				if issubclass(type(v),Field):
-					print "adding static attr: ",k,repr(v),type(v),klass
+					#print "adding static attr: ",k,repr(v),type(v),klass
 					if v.primary_key:
-						print "alternate primary key found"
+						#print "alternate primary key found, ",k
 						klass.__primary_key__ = k
 
 					klass.__fields__[k] = type(v)
 
 			if klass.__primary_key__ == None:
-				print "No primary key field found in {0}, adding default primary key 'id'".format(klass)
+				#print "No primary key field found in {0}, adding default primary key 'id'".format(klass)
 				klass.__fields__['id'] = IntField
 				klass.__primary_key__ = 'id'
-
+				setattr(klass,klass.__primary_key__,klass.__fields__[klass.__primary_key__](primary_key=True))
+			
 			return klass
 	
 	def __init__(self):
 		self._db = None
 		self._data = None
 		self._modified = False
+		self._field_instances = []
 
 		# Convert static members (subclasses of Model) to instance members of object(self)
 		for k,field_type in self.__fields__.items():
 			self.__dict__[k] = field_type()
 			self.__dict__[k]._parent = self
-			
+			self._field_instances.append(self.__dict__[k])
+
 			if k == self.__primary_key__:
-				print "pimary key: ",self.__primary_key__
-				self.primary_key = self.__dict__[k]
+				self.primary_key = self.__dict__[k]			# todo: make property
 				self.__dict__[k]._primary_key = True
+
+		#self._field_instances = sorted()
 
 	def set_modified(self,value):
 		#print self," was modified"
@@ -161,13 +165,14 @@ class Model(object):
 	def _direct_get_attr(self,name):
 		""" Bypass __setattr__
 		"""
-		print "Direct get: ",name,repr(object.__getattribute__(self,name))
+		#print "Direct get: ",name,repr(object.__getattribute__(self,name))
 		return object.__getattribute__(self,name)
 		
 class FooModel(Model):
 	fieldOne = IntField()
 	fieldTwo = IntField()
 	fieldThree = CharField()
+
 	def __init__(self):
 		super(FooModel,self).__init__()
 		
@@ -193,7 +198,39 @@ class FooModel(Model):
 		
 	def __str__(self):
 		return "FooModel[{0}]: {1} {2} {3}".format(self.id,self.fieldOne,self.fieldTwo,self.fieldThree)	
+
+class BazModel(Model):
+	pkey = IntField(primary_key=True)
+	date = IntField()
+	lefsa = CharField()
+
+	def __init__(self):
+		super(BazModel,self).__init__()
 		
+	@staticmethod
+	def fetch_all(db):
+		""" Fetch all objects of this type
+		
+			TODO:  make db global so we don't need to pass it in
+		"""
+		results = db.get_objects('BazModel')
+		ret = []
+		for result in results:
+			f = BazModel()
+			for field,value in result.items():
+				#print field,value
+				setattr(f,field,value)
+				
+				#todo:  this is a shit hack to remove modified flag
+				#when values are loaded from a db.  Fix.
+				f._direct_get_attr(field)._modified = False
+			ret.append(f)
+		return ret
+		
+	def __str__(self):
+		return "BazModel[{0}]: {1} {2}".format(self.pkey,self.date,self.lefsa)	
+
+
 class FileModel(Model):
 	path = CharField()
 	name = CharField()

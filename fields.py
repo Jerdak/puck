@@ -12,7 +12,11 @@ class Field(object):
 		self._data = None
 		self._owner = None
 		self._modified = True
-		self._primary_key = False
+
+		if 'primary_key' in kwargs:
+			self._primary_key = kwargs['primary_key']
+		else:
+			self._primary_key = False
 
 	@property
 	def modified(self):
@@ -52,8 +56,9 @@ class Field(object):
 		raise NotImplementedError("db_type() not implemented")
 		
 class IntField(Field):
-	def __init__(self):
-		super(IntField,self).__init__()
+	def __init__(self,**kwargs):
+		super(IntField,self).__init__(**kwargs)
+
 	@property
 	def primary_key(self):
 		return self._primary_key
@@ -64,8 +69,8 @@ class IntField(Field):
 		return self._db_repr_()	
 		
 class CharField(Field):
-	def __init__(self):
-		super(CharField,self).__init__()
+	def __init__(self,**kwargs):
+		super(CharField,self).__init__(**kwargs)
 	
 	def __str__(self):
 		return self._db_repr_()	
@@ -82,8 +87,8 @@ class CharField(Field):
 		return unicode("\""+data+"\"").encode('utf-8')
 		
 class DoubleField(Field):
-	def __init__(self):
-		super(DoubleField,self).__init__()
+	def __init__(self,**kwargs):
+		super(DoubleField,self).__init__(**kwargs)
 	
 	def __str__(self):
 		return self._db_repr_()	

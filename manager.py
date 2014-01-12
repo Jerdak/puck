@@ -53,7 +53,6 @@ def foo_model_test():
 	db = databases.SqliteDatabase()
 	db.connect('asd.db',True)
 	db.add_model(models.FooModel,create_table=True,drop_existing=True)
-	
 	# add a few dummy values manually
 	#db.execute("INSERT into FooModel VALUES(NULL,1,2,\"3\")")
 	#db.execute("INSERT into FooModel VALUES(NULL,4,5,\"6\")")
@@ -88,14 +87,37 @@ def foo_model_test():
 		print " - "+str(f)
 		
 	db.commit()
+
+def baz_model_test():
+	db = databases.SqliteDatabase()
+	db.connect('asd.db',True)
+	db.add_model(models.BazModel,create_table=True,drop_existing=True)
 	
+	# add a few dummy values manually
+	#db.execute("INSERT into FooModel VALUES(NULL,1,2,\"3\")")
+	#db.execute("INSERT into FooModel VALUES(NULL,4,5,\"6\")")
+	f = models.BazModel()
+	f._db = db
+	f.lefsa = 'yum'
+	f.date = "2014"
+	f.save()
+
+	f.lefsa = 'yummy'
+	f.save()
+
+	fs = models.BazModel().fetch_all(db)
+	print "Baz model test:"
+	for f in fs:
+		print " - "+str(f)
+		
+	db.commit()	
 if __name__ == '__main__':	
 	db = databases.SqliteDatabase()
 	db.connect('asd.db',True)
 	#db.create_tables_from_models(drop_existing=True)
 	
 	foo_model_test()
-	
+	baz_model_test()
 	sys.exit(0)
 	example_files(db)
 	
