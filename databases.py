@@ -240,7 +240,7 @@ class SqliteDatabase(Database):
 		)
 
 		#test = sorted(fields,key=lambda key:key.primary_key,reverse=True)
-		print "test:",self._models[model_name].primary_key
+		#print "test:",self._models[model_name].primary_key
 		#for x in fields:
 		#	print "x:",x,fields[x],fields[x].primary_key
 		field_string = ','.join(["{0} {1}".format(name,self._field_types[type]) for name,type in fields.items()])
