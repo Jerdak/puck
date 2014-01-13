@@ -62,7 +62,8 @@ def foo_model_test():
 	f.fieldTwo = 2
 	f.fieldThree = "3"
 	f.save()
-	
+	print "Current id: ",f.id
+
 	f = models.FooModel()
 	f._db = db
 	f.fieldOne = 4
@@ -77,7 +78,7 @@ def foo_model_test():
 	f.fieldTwo = -1
 	f.fieldThree = "c"
 	f.save()
-	
+
 	f.fieldOne = 42
 	f.save()
 	# fetch models resident in database 'db' (no django-like objects.all()... yet)
@@ -118,7 +119,6 @@ if __name__ == '__main__':
 	
 	foo_model_test()
 	baz_model_test()
-	sys.exit(0)
 	example_files(db)
 	
 	fs = models.FileModel().fetch_all(db)

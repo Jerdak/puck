@@ -25,24 +25,20 @@ class Model(object):
 			klass.__primary_key__ = None
 
 
-			# do nothing if base is Object (avoids static field lookup
-			# on non-Models (and on Model itself)
+
+			# -- Do following only for subclasses of Model, not model itself. --
 			if bases[0] == object:
 				return klass
 			
-			# Static fields in Models that are children of Model
-			# are cached for lookup during initialization
+			# cache class atrributes (only subclasses of Field)
 			for k,v in klass.__dict__.items():
 				if issubclass(type(v),Field):
-					#print "adding static attr: ",k,repr(v),type(v),klass
 					if v.primary_key:
-						#print "alternate primary key found, ",k
 						klass.__primary_key__ = k
-
 					klass.__fields__[k] = type(v)
 
+			# if no pkey assigned, create one manually
 			if klass.__primary_key__ == None:
-				#print "No primary key field found in {0}, adding default primary key 'id'".format(klass)
 				klass.__fields__['id'] = IntField
 				klass.__primary_key__ = 'id'
 				setattr(klass,klass.__primary_key__,klass.__fields__[klass.__primary_key__](primary_key=True))
@@ -66,7 +62,16 @@ class Model(object):
 				self.__dict__[k]._primary_key = True
 
 		#self._field_instances = sorted()
+	'''@property
+	def primary_key(self):
+		print "primary_key.getter"
+		return self.__dict__[self.__primary_key__]
 
+	@primary_key.setter
+	def primary_key(self,value):
+		print "primary_key.setter"
+		self.__dict__[self.__primary_key__] = value
+'''
 	def set_modified(self,value):
 		#print self," was modified"
 		self._modified = value
@@ -75,16 +80,13 @@ class Model(object):
 		if not self._modified and not force:
 			return
 		
-		#todo: only update modified variables
 		self.update_fields = {}
-		#print "save: ",repr(self)
 		for k,v in self.__fields__.items():
-			#todo:  replace naive string append w/ optimal version
-			#dummyQuery += "{0} = {1},".format(k,self.__dict__[k]._data)
 			if self.__dict__[k].modified:
-				#print "  - modified: ",k,v,self.__dict__[k]
+				print "save update: ",k,v
 				self.update_fields[k] = self.__dict__[k]
-	
+		
+		# db loads fields from this.update_fields
 		if not self._db == None:
 			self._db.modify(self)
 		else:
@@ -96,22 +98,13 @@ class Model(object):
 	def __getattr__(self, attr):
 		""" Get attribute (called when attr doesn't exist)
 		"""
-		
 		# Todo:  scrap this method when it's clear instances of Model types
 		# are properly being instanced and called
-		
 		print "Warning, get attr called:",attr
-		#if attr in self.__fields__:
-		#	print attr,"get found in attrs"
-		#	return self.__fields__[attr].data
-		#else:
-		#	return self.__dict__[attr]
 		self.__dict__[attr]
 	
 	def __getattribute__(self,name):
 		"""	Get attribute (called no matter what for ALL gets)
-		
-			Static me
 		"""
 		#print "get attribute:",name
 		
@@ -138,17 +131,11 @@ class Model(object):
 		"""
 		#print "setattr: ",repr(self),attr,value
 		
-		# prefer 'object.__getattribute__' to something like self.__dict__ ( which
-		# calls self.__getattribute__ again) or risk ending up in an infinite loop.  
+		# use 'object.__getattribute__' instead of self.__dict__ or risk infinite loop
 		stat_attrs = object.__getattribute__(self, '__fields__')
 		inst_attrs = object.__getattribute__(self, '__dict__')
 		if attr in stat_attrs:
-			#if value == inst_attrs[attr]._data:
-				#print "No change to data"
-				#return
-			#else:
-				# any modification to a Model field results in a total modifed state
-				#self._modified = True
+			print "  - inst attr set"
 			inst_attrs[attr].set_data(value)
 			return 
 	
@@ -163,7 +150,7 @@ class Model(object):
 		
 	
 	def _direct_get_attr(self,name):
-		""" Bypass __setattr__
+		""" Bypass __getattr__
 		"""
 		#print "Direct get: ",name,repr(object.__getattribute__(self,name))
 		return object.__getattribute__(self,name)

@@ -48,7 +48,6 @@ class SqliteDatabase(Database):
 		self.build_field_types()
 	
 	def __del__(self):
-		print "__del__"
 		self.disconnect()
 		
 	def build_field_types(self):
@@ -108,7 +107,6 @@ class SqliteDatabase(Database):
 			to ease the latency
 		"""
 		if not self._connection == None:
-			print "Committing"
 			self._connection.commit()
 			self._connection.close()
 			self._connection = None
@@ -158,13 +156,13 @@ class SqliteDatabase(Database):
 		
 	def get_next_id(self,table,pkey):
 		""" Get next valid id from autoincrementing id field
+
+		    Pretty much assumes the id column is INTEGER
 		"""
 		max_pkey = "max({0})".format(pkey)
 		statement = "SELECT {0} from {1}".format(max_pkey,table)
 		self.execute(statement)
 		result = self.fetchone()
-
-		print "next id: ",result
 		return 0 if max_pkey not in result else result[max_pkey] 
 		
 	def modify(self,model):
@@ -174,33 +172,37 @@ class SqliteDatabase(Database):
 				[1] - Decide whether or not to autocreate missing files
 				[2] - Decide how to handle someone manually setting 'id' in model
 		"""
-		table = model.__class__.__name__
+		model_name = model.__class__.__name__
 		pkey = model.primary_key
-		#test = model.primary_key
-		print "pkey:",repr(pkey),pkey,str(pkey)=='null',type(str(pkey))
-		temp_fields = model.update_fields
 
-		fields = []
-		for index, f in enumerate(self._model_fields[table]):
-			fields.append((f[0],temp_fields[f[0]]))
-		print "fields2:" ,fields
-		
+		#test = model.primary_key
+		print "pkey:",repr(pkey),pkey,str(pkey)=="null",type(str(pkey))
+		for f in self._model_fields[model_name]:
+			print "updating: ",f
+		fields = [(f[0],model.update_fields[f[0]]) for f in self._model_fields[model_name] if f[0] in model.update_fields]
+		print "fields to modify: ",fields
+
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
 		if str(pkey)  == 'null':
 			field_string = ','.join([str(value) for name,value in fields if value is not None])	
-			statement = "INSERT INTO {0} VALUES ({1})".format(table,field_string,pkey)
+			statement = "INSERT INTO {0} VALUES ({1})".format(model_name,field_string,pkey)
 			print statement
 			self.execute(statement)
 			
 			# make sure insertion sends back the updated id
-			model.primary_key = self.get_next_id(table,model.__primary_key__)
-			print "id: ",model.primary_key
+			# TODO:
+			#  [1] - Fix broken single responsiblity principle.  Database should not have
+			#  to update the primary key like it does here but because of __setattr__ being
+			#  overridden in `model` there isn't a mechanism currently to test if references
+			#  to fields are fields themselves.  SO model.primary_key = 1 makes model.primary_key
+			#  and int instead of passing that to the IntField's data member
+			model.primary_key.set_data(self.get_next_id(model_name,model.__primary_key__))
+			model.primary_key.modified = False
+			print "New primary key: ",model.primary_key,repr(model.primary_key)
 		else:
-			fields = fields[1:] #todo:  find better way to pop first element off list (first elem is primary key)
-
 			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields if value is not None])	
-			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(table,field_string,model.__primary_key__,pkey)
+			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(model_name,field_string,model.__primary_key__,pkey)
 			print statement
 			self.execute(statement)
 		
@@ -227,12 +229,9 @@ class SqliteDatabase(Database):
 			in model_type.__fields__.items()
 		)
 
-		# sort by primary_key, make sure to use model_type's attribute dictionary or else you won't be using valid class attributes
+		# sort by primary_key, make sure to use the model_type's attribute dictionary or else you won't be using valid class attribute instance
 		self._model_fields[model_name] = sorted(self._model_fields[model_name],key=lambda key:model_type.__dict__[key[0]].primary_key,reverse=True)
 		
-		for f in self._model_fields[model_name]:
-			print "model field: " ,f[0],repr(f[1]),model_type.__dict__[f[0]].primary_key
-
 		if 'create_table' in kwargs and kwargs['create_table']:
 			self.create_table_from_model(model_name,**kwargs)
 			
@@ -257,10 +256,8 @@ class SqliteDatabase(Database):
 		
 		pkey_name = self._models[model_name].__primary_key__
 		pkey_db_type = self._field_types[fields[0][1]]
-		#print "create primary key: ",pkey_name
-		#print "type: ", pkey_db_type
-
 		field_string = str.replace(field_string,"{0} {1}".format(pkey_name,pkey_db_type), "{0} {1} PRIMARY KEY".format(pkey_name,pkey_db_type))
+		
 		statement = "CREATE TABLE {0} ({1})".format(model_name,field_string)
 		print statement
 		self.execute(statement)

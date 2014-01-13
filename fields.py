@@ -21,7 +21,11 @@ class Field(object):
 	@property
 	def modified(self):
 		return self._modified
-	
+		
+	@modified.setter
+	def modified(self,value):
+		self._modified = value
+
 	@property
 	def primary_key(self):
 		return self._primary_key
@@ -62,6 +66,7 @@ class IntField(Field):
 	@property
 	def primary_key(self):
 		return self._primary_key
+
 	def __str__(self):
 		return self._db_repr_()	
 		
@@ -72,6 +77,10 @@ class CharField(Field):
 	def __init__(self,**kwargs):
 		super(CharField,self).__init__(**kwargs)
 	
+	@property
+	def primary_key(self):
+		return self._primary_key
+
 	def __str__(self):
 		return self._db_repr_()	
 		
@@ -83,8 +92,8 @@ class CharField(Field):
 		
 			CharFields require additional quotation marks
 		"""
-		data = "" if self._data == None else self._data
-		return unicode("\""+data+"\"").encode('utf-8')
+		data = 'null' if self._data == None else unicode("\""+self._data+"\"").encode('utf-8')
+		return data
 		
 class DoubleField(Field):
 	def __init__(self,**kwargs):
