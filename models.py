@@ -90,45 +90,29 @@ class Model(object):
 			self._fields = sorted(temp_fields,key=lambda key:self.__dict__[key[0]].primary_key,reverse=True)
 
 
-	def save(self,force=False):
-		if not self._modified and not force:
-			return
-		
-		# extract model.field types 
-		if self._field_list == None:
-			self._field_list = list(
-				(field_name,field_type) 
-				for field_name,field_type 
-				in self.__fields__.items()
-			)
+	def save(self):
+		""" Save any modified fields to the database
+		"""
 
-		updated_fields = [(self.__primary_key__,self.primary_key)]
+		if not self._modified:
+			return
+
+		updated_fields = []
 		for k,v in self.__fields__.items():
 			if self.__dict__[k].modified and self.__dict__[k] != self.primary_key:
 				updated_fields.append((k,self.__dict__[k]))
 
-		databases.database.modify2(self.__class__.__name__,self.primary_key,updated_fields)
-
-		return
-		'''self.update_fields = {}
-		for k,v in self.__fields__.items():
-			if self.__dict__[k].modified:
-				#print "save update: ",k,v
-				self.update_fields[k] = self.__dict__[k]
-		'''
-		# db loads fields from this.update_fields
-		databases.database.modify(self)
-		
-		# purge updated field cache
-		self.update_fields = None
+		databases.database.modify(self.__class__.__name__,self.primary_key,updated_fields)
 	
 	@classmethod
 	def create(cls):
-		print "cls name: ", cls.__name__
-		for k,field_type in cls.__fields__.items():
-			print "create",k,field_type		
+		""" Create a table for Model type
+		"""
+
+		#manually assign primary key as first element in field list
 		fields = [(cls.__primary_key__,cls.__fields__[cls.__primary_key__])]
 
+		# database expects list of tuples instead of dict
 		for k,field_type in cls.__fields__.items():
 			if k != cls.__primary_key__:
 				fields.append((k,field_type))

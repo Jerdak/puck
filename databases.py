@@ -165,15 +165,30 @@ class SqliteDatabase(Database):
 		result = self.fetchone()
 		return 0 if max_pkey not in result else result[max_pkey] 
 		
-	def modify2(self,model_name,pkey,fields):
+	def modify(self,table_name,pkey,fields):
+		""" Modify/Insert a row for `table_name`
+
+			Args:
+				pkey - Any Field Type.  Primary key for table_name
+				fields - Any Field [] types.  List of field tuples (name,value) to change
+
+			Todo:
+				[1] - Split function in to Insert and Update. 
+				[2] - Handle edge case when Fields = None
+				[3] - Dev. method to cache inserts to do a bulk commit later. (maybe add flush method?)
+		"""
 		for f in fields:
 			print "Updating field: ",f
 
+		# todo:  fix this expensive hack.  Right now it's important for the pkey to be
+		#        the first element since it's necessary for proper  column order.
+		#        pkey should be treated special depending on whether we're inserting or updating
+		fields = [(pkey.name,pkey)] + fields
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
 		if str(pkey)  == 'null':
 			field_string = ','.join([str(value) for name,value in fields if value is not None])	
-			statement = "INSERT INTO {0} VALUES ({1})".format(model_name,field_string,pkey)
+			statement = "INSERT INTO {0} VALUES ({1})".format(table_name,field_string,pkey)
 			print statement
 			self.execute(statement)
 			
@@ -184,74 +199,15 @@ class SqliteDatabase(Database):
 			#  overridden in `model` there isn't a mechanism currently to test if references
 			#  to fields are fields themselves.  SO model.primary_key = 1 makes model.primary_key
 			#  and int instead of passing that to the IntField's data member
-			pkey.set_data(self.get_next_id(model_name,pkey.name))
+			pkey.set_data(self.get_next_id(table_name,pkey.name))
 			pkey.modified = False
 			print "New primary key: ",pkey,repr(pkey)
 		else:
 			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields if value is not None])	
-			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(model_name,field_string,pkey.name,pkey)
-			print statement
-			self.execute(statement)
-
-	def modify(self,model):
-		""" Modify existing row or create if row doesn't exist
-		
-			TODO:
-				[1] - Decide whether or not to autocreate missing files
-				[2] - Decide how to handle someone manually setting 'id' in model
-		"""
-		model_name = model.__class__.__name__
-		pkey = model.primary_key
-
-		#test = model.primary_key
-		#print "pkey:",repr(pkey),pkey,str(pkey)=="null",type(str(pkey))
-		#for f in self._model_fields[model_name]:
-		#	print "updating: ",f
-		fields = [(f[0],model.update_fields[f[0]]) for f in self._model_fields[model_name] if f[0] in model.update_fields]
-		#print "fields to modify: ",fields
-		self.modify2(model_name,pkey,fields)
-		return
-		# todo: move insertion/update logic to separate functions or use 
-		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
-		if str(pkey)  == 'null':
-			field_string = ','.join([str(value) for name,value in fields if value is not None])	
-			statement = "INSERT INTO {0} VALUES ({1})".format(model_name,field_string,pkey)
-			print statement
-			self.execute(statement)
-			
-			# make sure insertion sends back the updated id
-			# TODO:
-			#  [1] - Fix broken single responsiblity principle.  Database should not have
-			#  to update the primary key like it does here but because of __setattr__ being
-			#  overridden in `model` there isn't a mechanism currently to test if references
-			#  to fields are fields themselves.  SO model.primary_key = 1 makes model.primary_key
-			#  and int instead of passing that to the IntField's data member
-			model.primary_key.set_data(self.get_next_id(model_name,model.__primary_key__))
-			model.primary_key.modified = False
-			print "New primary key: ",model.primary_key,repr(model.primary_key)
-		else:
-			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields if value is not None])	
-			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(model_name,field_string,model.__primary_key__,pkey)
+			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(table_name,field_string,pkey.name,pkey)
 			print statement
 			self.execute(statement)
 		
-		
-		
-	def add_model(self,model_type,**kwargs):
-		"""	Add ghost model to database
-			
-			Note:  Models added to the database don't immediately generate
-			a table, `create_tables_from_models` must be called for that to happen
-			
-			Input
-				model_type - string based name of the model
-				fields - dictionary of fields and fieldtype.  ex: {"fieldOne":fields.IntField,"fieldTwo":fields.CharField}
-		"""
-		model_name = model_type.__name__
-		self._models[model_name] = model_type
-		
-		if 'create_table' in kwargs and kwargs['create_table']:
-			self.create_table_from_model(model_name,**kwargs)
 		
 	def create_table(self,table_name,fields,**kwargs):
 		"""
@@ -275,42 +231,9 @@ class SqliteDatabase(Database):
 		statement = "CREATE TABLE {0} ({1})".format(table_name,field_string)
 		print statement
 		self.execute(statement)
-
-	def create_table_from_model(self,model_name,**kwargs):
-		"""	Create new tables for *all* ghost models stored in cache
-		
-			Input
-				drop_existing - Drop model table if it exists
-		"""
-		
-		if model_name == None or model_name not in self._model_fields:
-			print "[Warning] - Model <{0}> not is not valid.  (Either None or not added with add_model())".format(model_name)
-			return
-
-		fields = self._model_fields[model_name]
-		field_string = ','.join(["{0} {1}".format(name,self._field_types[type]) for name,type in fields])
-		
-		if 'drop_existing' in kwargs and kwargs['drop_existing']:
-			statement = "DROP TABLE IF EXISTS {0}".format(model_name)
-			print statement
-			self.execute(statement)
-		
-		pkey_name = self._models[model_name].__primary_key__
-		pkey_db_type = self._field_types[fields[0][1]]
-		field_string = str.replace(field_string,"{0} {1}".format(pkey_name,pkey_db_type), "{0} {1} PRIMARY KEY".format(pkey_name,pkey_db_type))
-		
-		statement = "CREATE TABLE {0} ({1})".format(model_name,field_string)
-		print statement
-		self.execute(statement)
 			
 	def test_model(self,model):
 		model.called_from_db()
-		
-	def create_tables_from_models(self,**kwargs):
-		"""	Create new tables for *all* ghost models stored in cache
-		"""
-		for model_name in self._model_fields.keys():
-			self.create_table_from_model(model_name,**kwargs)
 
 
 database = SqliteDatabase()
