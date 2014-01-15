@@ -53,9 +53,7 @@ def foo_model_test():
 	db = databases.SqliteDatabase()
 	db.connect('asd.db',True)
 	db.add_model(models.FooModel,create_table=True,drop_existing=True)
-	# add a few dummy values manually
-	#db.execute("INSERT into FooModel VALUES(NULL,1,2,\"3\")")
-	#db.execute("INSERT into FooModel VALUES(NULL,4,5,\"6\")")
+
 	f = models.FooModel()
 	f._db = db
 	f.fieldOne = 1

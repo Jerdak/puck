@@ -176,11 +176,11 @@ class SqliteDatabase(Database):
 		pkey = model.primary_key
 
 		#test = model.primary_key
-		print "pkey:",repr(pkey),pkey,str(pkey)=="null",type(str(pkey))
-		for f in self._model_fields[model_name]:
-			print "updating: ",f
+		#print "pkey:",repr(pkey),pkey,str(pkey)=="null",type(str(pkey))
+		#for f in self._model_fields[model_name]:
+		#	print "updating: ",f
 		fields = [(f[0],model.update_fields[f[0]]) for f in self._model_fields[model_name] if f[0] in model.update_fields]
-		print "fields to modify: ",fields
+		#print "fields to modify: ",fields
 
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update

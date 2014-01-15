@@ -83,7 +83,7 @@ class Model(object):
 		self.update_fields = {}
 		for k,v in self.__fields__.items():
 			if self.__dict__[k].modified:
-				print "save update: ",k,v
+				#print "save update: ",k,v
 				self.update_fields[k] = self.__dict__[k]
 		
 		# db loads fields from this.update_fields
@@ -135,7 +135,7 @@ class Model(object):
 		stat_attrs = object.__getattribute__(self, '__fields__')
 		inst_attrs = object.__getattribute__(self, '__dict__')
 		if attr in stat_attrs:
-			print "  - inst attr set"
+			#print "  - inst attr set"
 			inst_attrs[attr].set_data(value)
 			return 
 	
