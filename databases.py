@@ -165,6 +165,34 @@ class SqliteDatabase(Database):
 		result = self.fetchone()
 		return 0 if max_pkey not in result else result[max_pkey] 
 		
+	def modify2(self,model_name,pkey,fields):
+		for f in fields:
+			print "Updating field: ",f
+
+		# todo: move insertion/update logic to separate functions or use 
+		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
+		if str(pkey)  == 'null':
+			field_string = ','.join([str(value) for name,value in fields if value is not None])	
+			statement = "INSERT INTO {0} VALUES ({1})".format(model_name,field_string,pkey)
+			print statement
+			self.execute(statement)
+			
+			# make sure insertion sends back the updated id
+			# TODO:
+			#  [1] - Fix broken single responsiblity principle.  Database should not have
+			#  to update the primary key like it does here but because of __setattr__ being
+			#  overridden in `model` there isn't a mechanism currently to test if references
+			#  to fields are fields themselves.  SO model.primary_key = 1 makes model.primary_key
+			#  and int instead of passing that to the IntField's data member
+			pkey.set_data(self.get_next_id(model_name,pkey.name))
+			pkey.modified = False
+			print "New primary key: ",pkey,repr(pkey)
+		else:
+			field_string = ','.join(["{0}={1}".format(name,str(value)) for name,value in fields if value is not None])	
+			statement = "UPDATE {0} SET {1} WHERE {2} = {3}".format(model_name,field_string,pkey.name,pkey)
+			print statement
+			self.execute(statement)
+
 	def modify(self,model):
 		""" Modify existing row or create if row doesn't exist
 		
@@ -181,7 +209,8 @@ class SqliteDatabase(Database):
 		#	print "updating: ",f
 		fields = [(f[0],model.update_fields[f[0]]) for f in self._model_fields[model_name] if f[0] in model.update_fields]
 		#print "fields to modify: ",fields
-
+		self.modify2(model_name,pkey,fields)
+		return
 		# todo: move insertion/update logic to separate functions or use 
 		# 'insert or replace': http://stackoverflow.com/questions/3634984/insert-if-not-exists-else-update
 		if str(pkey)  == 'null':
@@ -219,22 +248,34 @@ class SqliteDatabase(Database):
 				fields - dictionary of fields and fieldtype.  ex: {"fieldOne":fields.IntField,"fieldTwo":fields.CharField}
 		"""
 		model_name = model_type.__name__
-		
 		self._models[model_name] = model_type
-
-		# extract model.field types 
-		self._model_fields[model_name] = list(
-			(field_name,field_type) 
-			for field_name,field_type 
-			in model_type.__fields__.items()
-		)
-
-		# sort by primary_key, make sure to use the model_type's attribute dictionary or else you won't be using valid class attribute instance
-		self._model_fields[model_name] = sorted(self._model_fields[model_name],key=lambda key:model_type.__dict__[key[0]].primary_key,reverse=True)
 		
 		if 'create_table' in kwargs and kwargs['create_table']:
 			self.create_table_from_model(model_name,**kwargs)
-			
+		
+	def create_table(self,table_name,fields,**kwargs):
+		"""
+		"""
+
+		if table_name == None:
+			print "[Warning] - Model <{0}> not is not valid.".format(table_name)
+			return
+
+		field_string = ','.join(["{0} {1}".format(name,self._field_types[type]) for name,type in fields])
+		if 'drop_table' in kwargs and kwargs['drop_table']:
+			statement = "DROP TABLE IF EXISTS {0}".format(table_name)
+			print statement
+			self.execute(statement)
+
+		# replace primary key in field string "<pkey_name> <field_type>" w/ "<pkey_name> <field_type> PRIMARY KEY"
+		pkey_name = fields[0][0]
+		pkey_type = self._field_types[fields[0][1]]
+		field_string = str.replace(field_string,"{0} {1}".format(pkey_name,pkey_type), "{0} {1} PRIMARY KEY".format(pkey_name,pkey_type))
+
+		statement = "CREATE TABLE {0} ({1})".format(table_name,field_string)
+		print statement
+		self.execute(statement)
+
 	def create_table_from_model(self,model_name,**kwargs):
 		"""	Create new tables for *all* ghost models stored in cache
 		
@@ -271,7 +312,10 @@ class SqliteDatabase(Database):
 		for model_name in self._model_fields.keys():
 			self.create_table_from_model(model_name,**kwargs)
 
-		
+
+database = SqliteDatabase()
+database.connect('asd.db',True)
+
 if __name__ == '__main__':		
 	db = SqliteDatabase()
 	db.connect('asd.db',True)

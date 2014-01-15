@@ -5,6 +5,7 @@ import copy
 import new
 import types
 import sys
+import databases
 
 from fields import *
 from collections import *
@@ -23,8 +24,6 @@ class Model(object):
 			attrs = []
 			klass.__fields__ = {}
 			klass.__primary_key__ = None
-
-
 
 			# -- Do following only for subclasses of Model, not model itself. --
 			if bases[0] == object:
@@ -46,7 +45,6 @@ class Model(object):
 			return klass
 	
 	def __init__(self):
-		self._db = None
 		self._data = None
 		self._modified = False
 		self._field_instances = []
@@ -54,7 +52,8 @@ class Model(object):
 		# Convert static members (subclasses of Model) to instance members of object(self)
 		for k,field_type in self.__fields__.items():
 			self.__dict__[k] = field_type()
-			self.__dict__[k]._parent = self
+			self.__dict__[k].parent = self
+			self.__dict__[k].name = k
 			self._field_instances.append(self.__dict__[k])
 
 			if k == self.__primary_key__:
@@ -76,32 +75,72 @@ class Model(object):
 		#print self," was modified"
 		self._modified = value
 		
+	@property 
+	def fields(self):
+		""" Get all fields sorted by primary_key
+
+			e.g. fields[0] will always be self.primary_key
+		"""
+		if self._fields == None:
+			temp_fields = list(
+				(field_name,field_type) 
+				for field_name,field_type 
+				in self.__fields__.items()
+			)
+			self._fields = sorted(temp_fields,key=lambda key:self.__dict__[key[0]].primary_key,reverse=True)
+
+
 	def save(self,force=False):
 		if not self._modified and not force:
 			return
 		
-		self.update_fields = {}
+		# extract model.field types 
+		if self._field_list == None:
+			self._field_list = list(
+				(field_name,field_type) 
+				for field_name,field_type 
+				in self.__fields__.items()
+			)
+
+		updated_fields = [(self.__primary_key__,self.primary_key)]
+		for k,v in self.__fields__.items():
+			if self.__dict__[k].modified and self.__dict__[k] != self.primary_key:
+				updated_fields.append((k,self.__dict__[k]))
+
+		databases.database.modify2(self.__class__.__name__,self.primary_key,updated_fields)
+
+		return
+		'''self.update_fields = {}
 		for k,v in self.__fields__.items():
 			if self.__dict__[k].modified:
 				#print "save update: ",k,v
 				self.update_fields[k] = self.__dict__[k]
-		
+		'''
 		# db loads fields from this.update_fields
-		if not self._db == None:
-			self._db.modify(self)
-		else:
-			print "[Warning] - No db attached to model type {0}".format(type(self))
+		databases.database.modify(self)
 		
 		# purge updated field cache
 		self.update_fields = None
 	
+	@classmethod
+	def create(cls):
+		print "cls name: ", cls.__name__
+		for k,field_type in cls.__fields__.items():
+			print "create",k,field_type		
+		fields = [(cls.__primary_key__,cls.__fields__[cls.__primary_key__])]
+
+		for k,field_type in cls.__fields__.items():
+			if k != cls.__primary_key__:
+				fields.append((k,field_type))
+		databases.database.create_table(cls.__name__,fields,drop_table=True)
+
 	def __getattr__(self, attr):
 		""" Get attribute (called when attr doesn't exist)
 		"""
 		# Todo:  scrap this method when it's clear instances of Model types
 		# are properly being instanced and called
 		print "Warning, get attr called:",attr
-		self.__dict__[attr]
+		return self.__dict__[attr] if attr in self.__dict__ else None
 	
 	def __getattribute__(self,name):
 		"""	Get attribute (called no matter what for ALL gets)
@@ -164,12 +203,12 @@ class FooModel(Model):
 		super(FooModel,self).__init__()
 		
 	@staticmethod
-	def fetch_all(db):
+	def fetch_all():
 		""" Fetch all objects of this type
 		
 			TODO:  make db global so we don't need to pass it in
 		"""
-		results = db.get_objects('FooModel')
+		results = databases.database.get_objects('FooModel')
 		ret = []
 		for result in results:
 			f = FooModel()
@@ -195,12 +234,12 @@ class BazModel(Model):
 		super(BazModel,self).__init__()
 		
 	@staticmethod
-	def fetch_all(db):
+	def fetch_all():
 		""" Fetch all objects of this type
 		
 			TODO:  make db global so we don't need to pass it in
 		"""
-		results = db.get_objects('BazModel')
+		results = databases.database.get_objects('BazModel')
 		ret = []
 		for result in results:
 			f = BazModel()
@@ -224,18 +263,17 @@ class FileModel(Model):
 	size = IntField()
 		
 	@staticmethod
-	def fetch_all(db):
+	def fetch_all():
 		""" Fetch all objects of this type
 		
 			TODO:  
 			[1] make db global so we don't need to pass it in
 			[2] make this a generic method of parent. (if possible)
 		"""
-		results = db.get_objects('FileModel')
+		results = databases.database.get_objects('FileModel')
 		ret = []
 		for result in results:
 			f = FileModel()
-			f._db = db
 			for field,value in result.items():
 				setattr(f,field,value)
 				

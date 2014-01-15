@@ -12,7 +12,9 @@ class Field(object):
 		self._data = None
 		self._owner = None
 		self._modified = True
-
+		self._parent = None
+		self._name = "Field"
+		
 		if 'primary_key' in kwargs:
 			self._primary_key = kwargs['primary_key']
 		else:
@@ -25,6 +27,22 @@ class Field(object):
 	@modified.setter
 	def modified(self,value):
 		self._modified = value
+
+	@property
+	def name(self):
+		return self._name
+		
+	@name.setter
+	def name(self,value):
+		self._name = value
+
+	@property
+	def parent(self):
+		return self._parent
+		
+	@name.setter
+	def parent(self,value):
+		self._parent = value
 
 	@property
 	def primary_key(self):

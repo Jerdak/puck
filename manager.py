@@ -4,11 +4,11 @@ import databases
 import sys
 import os
 
-def example_files(db):
+def example_files():
 	""" Example of building a database using local files
 	"""
-	db.add_model(models.FileModel,create_table=True,drop_existing=True)
-	
+	#databases.database.add_model(models.FileModel,create_table=True,drop_existing=True)
+	models.FileModel.create()
 	for f in os.listdir('.'):
 		if os.path.isfile(os.path.join('.',f)):
 			path = os.path.abspath(os.path.join('.',f))
@@ -16,7 +16,6 @@ def example_files(db):
 			#print path
 			#print info
 			fm = models.FileModel()
-			fm._db = db
 			fm.path = path
 			fm.name = f
 			fm.size = info.st_size
@@ -50,12 +49,10 @@ def dump_fields(model_instance):
 	print "fields in {0}: {1}".format(model_instance,isnt_attrs)
 	
 def foo_model_test():
-	db = databases.SqliteDatabase()
-	db.connect('asd.db',True)
-	db.add_model(models.FooModel,create_table=True,drop_existing=True)
-
+	#TODO:  each model should be responsible for notifying the database of its creation (handled by metalclass)
+	#databases.database.add_model(models.FooModel,create_table=True,drop_existing=True)
+	models.FooModel.create()
 	f = models.FooModel()
-	f._db = db
 	f.fieldOne = 1
 	f.fieldTwo = 2
 	f.fieldThree = "3"
@@ -63,7 +60,6 @@ def foo_model_test():
 	print "Current id: ",f.id
 
 	f = models.FooModel()
-	f._db = db
 	f.fieldOne = 4
 	f.fieldTwo = 5
 	f.fieldThree = "6"
@@ -71,7 +67,6 @@ def foo_model_test():
 	
 	# add a new FooModel object model
 	f = models.FooModel()
-	f._db = db
 	f.fieldOne = 12
 	f.fieldTwo = -1
 	f.fieldThree = "c"
@@ -80,23 +75,21 @@ def foo_model_test():
 	f.fieldOne = 42
 	f.save()
 	# fetch models resident in database 'db' (no django-like objects.all()... yet)
-	fs = models.FooModel().fetch_all(db)
+	fs = models.FooModel().fetch_all()
 	print "Foo model test:"
 	for f in fs:
 		print " - "+str(f)
 		
-	db.commit()
+	databases.database.commit()
 
 def baz_model_test():
-	db = databases.SqliteDatabase()
-	db.connect('asd.db',True)
-	db.add_model(models.BazModel,create_table=True,drop_existing=True)
-	
+	#databases.database.add_model(models.BazModel,create_table=True,drop_existing=True)
 	# add a few dummy values manually
 	#db.execute("INSERT into FooModel VALUES(NULL,1,2,\"3\")")
 	#db.execute("INSERT into FooModel VALUES(NULL,4,5,\"6\")")
+	models.BazModel.create()
+
 	f = models.BazModel()
-	f._db = db
 	f.lefsa = 'yum'
 	f.date = "2014"
 	f.save()
@@ -104,22 +97,19 @@ def baz_model_test():
 	f.lefsa = 'yummy'
 	f.save()
 
-	fs = models.BazModel().fetch_all(db)
+	fs = models.BazModel().fetch_all()
 	print "Baz model test:"
 	for f in fs:
 		print " - "+str(f)
 		
-	db.commit()	
+	databases.database.commit()	
+
 if __name__ == '__main__':	
-	db = databases.SqliteDatabase()
-	db.connect('asd.db',True)
-	#db.create_tables_from_models(drop_existing=True)
-	
 	foo_model_test()
 	baz_model_test()
-	example_files(db)
+	example_files()
 	
-	fs = models.FileModel().fetch_all(db)
+	fs = models.FileModel().fetch_all()
 	for f in fs:
 		print str(f)
 		
@@ -133,4 +123,4 @@ if __name__ == '__main__':
 	fs[4].save()
 	fs[5].save()
 	
-	db.commit()
+	databases.database.commit()
