@@ -1,0 +1,10 @@
+TODO
+	[1] - Right now, fields are responsible for reporting back their database representation.  That's not ideal.  Each DB should have a table
+	of representations to use for each field type.  All fields could then report their data purely as strings and let the DB wrapper
+	handle reconverting to a valid data type.
+
+	[2] - Filters need some work.  Much like [1], the value in example__exact=value must contain user defined quotes
+	when the field is a text type.  The database should look this up and convert as needed.  Maybe the DB needs
+	to store a copy of each model type loaded that it can "glance" at when it needs to know field types
+
+	[3] - Make filters in to classes
