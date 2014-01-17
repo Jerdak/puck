@@ -75,7 +75,7 @@ def foo_model_test():
 	f.fieldOne = 42
 	f.save()
 	# fetch models resident in database 'db' (no django-like objects.all()... yet)
-	fs = models.FooModel().fetch_all()
+	fs = models.FooModel().fetch()
 	print "Foo model test:"
 	for f in fs:
 		print " - "+str(f)
@@ -97,7 +97,7 @@ def baz_model_test():
 	f.lefsa = 'yummy'
 	f.save()
 
-	fs = models.BazModel().fetch_all()
+	fs = models.BazModel().fetch()
 	print "Baz model test:"
 	for f in fs:
 		print " - "+str(f)
@@ -109,10 +109,12 @@ if __name__ == '__main__':
 	baz_model_test()
 	example_files()
 	
-	fs = models.FileModel().fetch_all()
+	fs = models.FileModel().fetch()
 	for f in fs:
 		print str(f)
 		
+
+	
 	fs[4].path = "C:\To\My\Pants.txt"
 	fs[4].name = "Pants.txt"
 	fs[4].size = 69
@@ -123,4 +125,11 @@ if __name__ == '__main__':
 	fs[4].save()
 	fs[5].save()
 	
+	fs = models.FileModel().fetch(filter='size__lt=129')
+	for f in fs:
+		print "filtered by size: ",str(f)
+
+	fs = models.FileModel().fetch(filter='name__contains="%filters%"')
+	for f in fs:
+		print "filtered by name: ",str(f)
 	databases.database.commit()

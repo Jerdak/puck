@@ -92,6 +92,11 @@ class Model(object):
 
 	def save(self):
 		""" Save any modified fields to the database
+		
+			todo:
+				[1] - If pkey is not set, save should intelligently tell the database we're inserting a new
+				element rather than forcing the database to decide.  if it is set, use Update.
+				[2] - 
 		"""
 
 		if not self._modified:
@@ -177,25 +182,18 @@ class Model(object):
 		"""
 		#print "Direct get: ",name,repr(object.__getattribute__(self,name))
 		return object.__getattribute__(self,name)
-		
-class FooModel(Model):
-	fieldOne = IntField()
-	fieldTwo = IntField()
-	fieldThree = CharField()
-
-	def __init__(self):
-		super(FooModel,self).__init__()
-		
-	@staticmethod
-	def fetch_all():
+	
+	@classmethod
+	def fetch(cls,**kwargs):
 		""" Fetch all objects of this type
 		
 			TODO:  make db global so we don't need to pass it in
 		"""
-		results = databases.database.get_objects('FooModel')
+		results = databases.database.get_objects(cls.__name__,**kwargs)
 		ret = []
 		for result in results:
-			f = FooModel()
+			f = globals()[cls.__name__]()
+			#print "Global: ",globals()[cls.__name__]
 			for field,value in result.items():
 				#print field,value
 				setattr(f,field,value)
@@ -205,7 +203,15 @@ class FooModel(Model):
 				f._direct_get_attr(field)._modified = False
 			ret.append(f)
 		return ret
-		
+	
+class FooModel(Model):
+	fieldOne = IntField()
+	fieldTwo = IntField()
+	fieldThree = CharField()
+
+	def __init__(self):
+		super(FooModel,self).__init__()
+
 	def __str__(self):
 		return "FooModel[{0}]: {1} {2} {3}".format(self.id,self.fieldOne,self.fieldTwo,self.fieldThree)	
 
@@ -216,27 +222,7 @@ class BazModel(Model):
 
 	def __init__(self):
 		super(BazModel,self).__init__()
-		
-	@staticmethod
-	def fetch_all():
-		""" Fetch all objects of this type
-		
-			TODO:  make db global so we don't need to pass it in
-		"""
-		results = databases.database.get_objects('BazModel')
-		ret = []
-		for result in results:
-			f = BazModel()
-			for field,value in result.items():
-				#print field,value
-				setattr(f,field,value)
-				
-				#todo:  this is a shit hack to remove modified flag
-				#when values are loaded from a db.  Fix.
-				f._direct_get_attr(field)._modified = False
-			ret.append(f)
-		return ret
-		
+			
 	def __str__(self):
 		return "BazModel[{0}]: {1} {2}".format(self.pkey,self.date,self.lefsa)	
 
@@ -246,38 +232,12 @@ class FileModel(Model):
 	name = CharField()
 	size = IntField()
 		
-	@staticmethod
-	def fetch_all():
-		""" Fetch all objects of this type
-		
-			TODO:  
-			[1] make db global so we don't need to pass it in
-			[2] make this a generic method of parent. (if possible)
-		"""
-		results = databases.database.get_objects('FileModel')
-		ret = []
-		for result in results:
-			f = FileModel()
-			for field,value in result.items():
-				setattr(f,field,value)
-				
-				#todo:  this is a shit hack to remove modified flag
-				#when values are loaded from a db.  Fix.
-				f._direct_get_attr(field)._modified = False
-			ret.append(f)
-		return ret
-	
-	def called_from_db(self):
-		print "File model called from db"
-	
-	def call_from_db(self,db):
-		db.test_model(self)
-	
 	def __init__(self):
 		super(FileModel,self).__init__()	
 	
 	def __str__(self):
 		return "FileMode[{0}]: {1} {2} {3}".format(self.id,self.path,self.name,self.size)
+
 #def method6():
 #	return ''.join([repr(num) for num in xrange(12)])	
 

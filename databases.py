@@ -2,6 +2,7 @@ import sqlite3 as lite
 import fields
 import sys
 import os
+import filters
 
 '''
 	TODO
@@ -145,10 +146,24 @@ class SqliteDatabase(Database):
 			print "Sqlite3 Error %s:" % e.args[0]
 			return None
 	
-	def get_objects(self,table_name):
+	def get_objects(self,table_name,**kwargs):
 		"""	Get all objects/rows from table
+		
+			Args
+				table_name:  String.  Name of table(model)
+				filter: String.  Type of filter to use on results
+
+			Notes:
+				Queries use ad-hoc filtering so it's expected that results aren't cached (TODO:  But it might be worthwhile to do so)
 		"""
-		statement = "SELECT * from {0}".format(table_name)
+		
+		if 'filter' in kwargs:
+			filter = filters.get_filter(kwargs['filter'])
+			statement = "SELECT * from {0} WHERE {1} {2} {3}".format(table_name,filter[0],filter[1],filter[2])
+		else:
+			statement = "SELECT * from {0}".format(table_name)
+
+		print statement
 		self.execute(statement)
 		results = self.fetchall()
 		
@@ -210,7 +225,14 @@ class SqliteDatabase(Database):
 		
 		
 	def create_table(self,table_name,fields,**kwargs):
-		"""
+		""" Create a new table
+
+			Args
+				table_name - String.  Table name.
+				fields - List.  List of (field_name,field_type) tuples.
+				drop_table - bool.  If true, drop table if it exists
+		
+
 		"""
 
 		if table_name == None:
@@ -231,10 +253,6 @@ class SqliteDatabase(Database):
 		statement = "CREATE TABLE {0} ({1})".format(table_name,field_string)
 		print statement
 		self.execute(statement)
-			
-	def test_model(self,model):
-		model.called_from_db()
-
 
 database = SqliteDatabase()
 database.connect('asd.db',True)
