@@ -75,9 +75,30 @@ class Model(object):
 		#print self," was modified"
 		self._modified = value
 		
+	@classmethod
+	def fetch(cls,**kwargs):
+		""" Fetch all objects of this type
+		
+			TODO:  make db global so we don't need to pass it in
+		"""
+		results = databases.database.get_objects(cls.__name__,**kwargs)
+		ret = []
+		for result in results:
+			# instantiate class 'cls.__name__'
+			f = globals()[cls.__name__]()
+
+			for field,value in result.items():
+				setattr(f,field,value)
+				
+				#todo:  this is a shit hack to remove modified flag
+				#when values are loaded from a db.  Fix.
+				f._direct_get_attr(field)._modified = False
+			ret.append(f)
+		return ret
+
 	@property 
 	def fields(self):
-		""" Get all fields sorted by primary_key
+		""" Return all fields, sorted by their primary key
 
 			e.g. fields[0] will always be self.primary_key
 		"""
@@ -91,14 +112,13 @@ class Model(object):
 
 
 	def save(self):
-		""" Save any modified fields to the database
+		""" Save modified fields to the database
 		
 			todo:
 				[1] - If pkey is not set, save should intelligently tell the database we're inserting a new
 				element rather than forcing the database to decide.  if it is set, use Update.
 				[2] - 
 		"""
-
 		if not self._modified:
 			return
 
@@ -116,12 +136,13 @@ class Model(object):
 
 		#manually assign primary key as first element in field list
 		fields = [(cls.__primary_key__,cls.__fields__[cls.__primary_key__])]
+		table_name = cls.__name__
 
 		# database expects list of tuples instead of dict
 		for k,field_type in cls.__fields__.items():
 			if k != cls.__primary_key__:
 				fields.append((k,field_type))
-		databases.database.create_table(cls.__name__,fields,drop_table=True)
+		databases.database.create_table(table_name,fields,drop_table=True)
 
 	def __getattr__(self, attr):
 		""" Get attribute (called when attr doesn't exist)
@@ -182,27 +203,7 @@ class Model(object):
 		"""
 		#print "Direct get: ",name,repr(object.__getattribute__(self,name))
 		return object.__getattribute__(self,name)
-	
-	@classmethod
-	def fetch(cls,**kwargs):
-		""" Fetch all objects of this type
-		
-			TODO:  make db global so we don't need to pass it in
-		"""
-		results = databases.database.get_objects(cls.__name__,**kwargs)
-		ret = []
-		for result in results:
-			f = globals()[cls.__name__]()
-			#print "Global: ",globals()[cls.__name__]
-			for field,value in result.items():
-				#print field,value
-				setattr(f,field,value)
-				
-				#todo:  this is a shit hack to remove modified flag
-				#when values are loaded from a db.  Fix.
-				f._direct_get_attr(field)._modified = False
-			ret.append(f)
-		return ret
+
 	
 class FooModel(Model):
 	fieldOne = IntField()
